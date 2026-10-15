@@ -7,6 +7,7 @@
   "type": "module",
   "scripts": {
     "goggle": "tsx src/cli/transmute.ts",
+    "regoggle": "tsx src/cli/regoggle.ts",
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
     "test": "vitest run",

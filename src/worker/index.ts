@@ -8,8 +8,8 @@
 import { aiSafety } from "../../lenses/ai-safety.ts";
 import { OriginError, parseTargetUrl } from "../core/fetchOrigin.ts";
 import { mockRewriter, openAiRewriter, type Rewriter } from "../core/llm.ts";
-import { transmuteUrl } from "../core/transmute.ts";
-import { getPage, pageKey, putPage, tryLock, unlock } from "./cache.ts";
+import { renderTranslation, translateUrl, type Translation } from "../core/transmute.ts";
+import { getRendered, getTranslation, pageKey, putRendered, putTranslation, tryLock, unlock } from "./cache.ts";
 import { countView, directory, exhaustToday, logMiss, recordPage, recordSpend, spentToday } from "./db.ts";
 import { denyReason } from "./gate.ts";
 import { deniedPage, directoryPage, errorPage, foggedPage, homePage, INTERSTITIAL_SCRIPT, interstitialPage } from "./pages.ts";
@@ -60,10 +60,18 @@ export default {
     if ("response" in checked) return checked.response;
     const { page, key } = checked;
 
-    const cached = await getPage(env.PAGES, key);
-    if (cached) {
+    let rendered = await getRendered(env.PAGES, key);
+    if (!rendered) {
+      // Translated before, but not with the current chrome: re-render, no LLM needed.
+      const translation = await getTranslation(env.PAGES, key);
+      if (translation) {
+        rendered = render(translation, env, proxyBase);
+        ctx.waitUntil(putRendered(env.PAGES, key, rendered).catch(() => undefined));
+      }
+    }
+    if (rendered) {
       ctx.waitUntil(countView(env.DB, page.href).catch(() => undefined));
-      return html(cached, 200, { "Content-Security-Policy": GOGGLED_CSP, "Cache-Control": "public, max-age=3600" });
+      return html(rendered, 200, { "Content-Security-Policy": GOGGLED_CSP, "Cache-Control": "public, max-age=3600" });
     }
     if ((await spentToday(env.DB)) >= budget(env)) {
       ctx.waitUntil(logMiss(env.DB, page.href, "budget").catch(() => undefined));
@@ -78,7 +86,7 @@ async function transmuteApi(target: string, env: Env, ctx: Ctx, self: URL): Prom
   if ("response" in checked) return json({ status: "error", message: "We don't goggle this page." }, checked.response.status);
   const { page, key } = checked;
 
-  if (await getPage(env.PAGES, key)) return json({ status: "ready" });
+  if (await getTranslation(env.PAGES, key)) return json({ status: "ready" });
   if ((await spentToday(env.DB)) >= budget(env)) {
     ctx.waitUntil(logMiss(env.DB, page.href, "budget").catch(() => undefined));
     return json({ status: "fogged" });
@@ -88,17 +96,11 @@ async function transmuteApi(target: string, env: Env, ctx: Ctx, self: URL): Prom
   let rewriter: Rewriter | undefined;
   try {
     rewriter = makeRewriter(env);
-    const result = await transmuteUrl(page.href, {
-      lens: aiSafety,
-      rewriter,
-      readmeUrl: env.README_URL,
-      proxyBase: `${self.origin}/`,
-      fetch: { deny: (u) => denyReason(u, self.hostname) },
-    });
-    const { segments, rewritten } = result.stats;
-    if (segments > 0 && rewritten / segments < MIN_REWRITTEN) throw new Error(`only ${rewritten}/${segments} segments rewritten`);
-    await putPage(env.PAGES, key, result.html);
-    await recordPage(env.DB, { url: page.href, title: result.title, sourceTopic: result.glossary.sourceTopic, costUsd: result.usage.costUsd });
+    const t = await translateUrl(page.href, { lens: aiSafety, rewriter, fetch: { deny: (u) => denyReason(u, self.hostname) } });
+    if (t.segments > 0 && t.rewritten / t.segments < MIN_REWRITTEN) throw new Error(`only ${t.rewritten}/${t.segments} segments rewritten`);
+    await putTranslation(env.PAGES, key, t);
+    await putRendered(env.PAGES, key, render(t, env, `${self.origin}/`));
+    await recordPage(env.DB, { url: page.href, title: t.title, sourceTopic: t.glossary.sourceTopic, costUsd: t.usage.costUsd });
     return json({ status: "ready" });
   } catch (e) {
     if (e instanceof OriginError) {
@@ -148,6 +150,9 @@ export function targetFromRequest(url: URL): string | null {
 }
 
 const budget = (env: Env) => Number(env.DAILY_BUDGET_USD) || 0;
+
+const render = (t: Translation, env: Env, proxyBase: string) =>
+  renderTranslation(t, { lens: aiSafety, readmeUrl: env.README_URL, proxyBase }).html;
 
 function makeRewriter(env: Env): Rewriter {
   if (env.MODEL === "mock") return mockRewriter();

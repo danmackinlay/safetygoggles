@@ -105,6 +105,20 @@ describe("goggling flow", () => {
     expect((await call("/directory").then((r) => r.text()))).toContain("Fifteen years of climate work");
   });
 
+  it("re-renders a new chrome version from the stored translation, with no fetch or model call", async () => {
+    await call("/api/transmute?url=https://example.org/post");
+    // Simulate a CHROME_VERSION bump: the rendered copy is gone, the translation remains.
+    for (const k of [...env.PAGES.map.keys()]) if (k.startsWith("page:")) env.PAGES.map.delete(k);
+    const fetchSpy = vi.fn(async () => { throw new Error("no network on re-render"); });
+    vi.stubGlobal("fetch", fetchSpy);
+
+    const res = await call("/https://example.org/post");
+    expect(res.status).toBe(200);
+    expect(await res.text()).toContain("The AI safety fight");
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect([...env.PAGES.map.keys()].some((k) => k.startsWith("page:"))).toBe(true); // re-cached
+  });
+
   it("says pending while another request holds the lock, and doesn't spend twice", async () => {
     await call("/https://example.org/post"); // interstitial only; nothing cached yet
     expect(env.PAGES.map.size).toBe(0);

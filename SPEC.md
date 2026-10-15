@@ -53,11 +53,29 @@ Phase 1 request flow:
 
 ```
 GET /https://site/page   (also /site/page)
-  ├─ normalise URL → cache key = sha256(url | lens.version | model)
-  ├─ hit (Cache API → KV) ─────────────────────────────────────▶ serve
-  └─ miss → gate (see Access) → interstitial "🥽 putting on goggles…"
-              └─ page JS calls GET /api/transmute?url=…   (~10–20 s)
+  ├─ normalise URL → key = sha256(url | lens.version | model)
+  ├─ rendered page in KV for the current CHROME_VERSION ──────────────▶ serve
+  ├─ translation in KV → render it now (CPU only, no LLM) → cache ────▶ serve
+  └─ neither → gate (see Access) → interstitial "🥽 putting on goggles…"
+              └─ page JS calls GET /api/transmute?url=…   (~30 s): translate, store, render
 ```
+
+**Two cache layers.** The expensive and cheap parts are stored separately, so chrome
+changes never cost LLM calls.
+- **Translation** (`tr:<key>`, kept 180 days): the origin HTML snapshot, the glossary,
+  and the rewrites as a dictionary keyed by segment *source text*. Keying by text
+  rather than segment number means a later change to segmentation can't misplace a
+  rewrite; unmatched text just stays original. Only `/api/transmute` creates one.
+- **Rendered page** (`page:<key>:<CHROME_VERSION>`, kept 30 days): snapshot plus
+  rewrites plus the current chrome.
+
+What to bump:
+- **Chrome change** (anything in `decorate.ts`, or the lens tagline): bump
+  `CHROME_VERSION`. Every page re-renders on its next visit, free.
+- **Prompt or primer change:** bump `lens.version`. Every page re-translates on its next
+  visit, paid from the daily budget.
+- **One page:** `npm run regoggle -- <url>` re-translates it, and `--render`
+  re-renders it only.
 
 `transmuteUrl()` in `src/core/transmute.ts` works in both runtimes:
 
@@ -103,8 +121,9 @@ GET /https://site/page   (also /site/page)
    - `stats.unchanged` counts rewrites identical to their source. A high count means
      the model is only doing find-and-replace.
 7. **`decorate`.** Adds a one-line banner (tagline, attribution, original link,
-   README link, bookmarklet), a fixed badge whose "goggles off" button links to the
-   original, and `noindex`. It adds **no scripts**, so the Worker can serve pages with
+   "Goggle a page yourself", README link, bookmarklet), a fixed badge whose
+   "goggles off" button links to the original, the lens frame with its printed strip,
+   and `noindex`. It adds **no scripts**, so the Worker can serve pages with
    `script-src 'none'`.
 
 **Lenses.** A lens (`lenses/ai-safety.ts`) holds the target domain, the banner
@@ -223,7 +242,7 @@ There's no hand-maintained allowlist.
   logged-out version.
 - **Storage:**
   - D1 holds `pages`, `wishlist` and `budget` (one row per UTC day).
-  - KV holds the rendered HTML: a 30-day TTL, plus `s-maxage` of 7 days at the edge.
+  - KV holds translations (180 days) and rendered pages per chrome version (30 days).
 
 Hardening in every mode:
 - **GET-only, end to end.**
@@ -255,8 +274,12 @@ Not legal advice.
   makes clear that the joke is on the reader wearing the goggles, not on the page's
   subjects.
 - **The badge** ("🥽 safetygoggles · 👓 Goggles off") stays fixed on screen, so most
-  screenshots carry it. A watermark was considered and dropped: it is fragile and
-  over-egged, and anyone determined to fake a screenshot can edit the DOM anyway.
+  screenshots carry it.
+- **The frame print:** "safetygoggles · rewritten by machine · not the original"
+  repeats along the bottom of the lens frame, like branding on a goggle strap. It was
+  added on reader feedback asking for a watermark. Unlike the earlier diagonal
+  watermark over the text, it never covers content. It is CSS only; anyone determined
+  to fake a screenshot can still edit the DOM, which no watermark prevents.
 - **Rewritten bios** may recast the author's career, but only with *invented*
   organisations. A real person is never placed in a real organisation.
 - **The posture:** non-commercial, no ads, `noindex`, short cache TTLs, fast opt-out

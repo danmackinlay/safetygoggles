@@ -24,7 +24,9 @@ A goggled page is a satirical machine rewrite of someone else's work. **The orig
 author did not write it and may not agree with it.** Every goggled page has:
 - a banner saying who originally wrote it and what it was about, with a link to the
   original;
-- a fixed **"🥽 safetygoggles · 👓 Goggles off"** badge that takes you to the original.
+- a fixed **"🥽 safetygoggles · 👓 Goggles off"** badge that takes you to the original;
+- "rewritten by machine · not the original" printed along the bottom of the goggles
+  frame.
 
 The rewrite may give the author an imaginary AI-safety career. Any organisations in
 it are invented.
@@ -38,10 +40,20 @@ Opt-outs are honoured promptly and cached copies are deleted.
 
 ## Status
 
-Prototype. A command-line tool goggles one page into a local HTML file. The hosted
-proxy (a Cloudflare Worker with a bookmarklet, a cache and a public directory) is the
-next phase. See [SPEC.md](SPEC.md) for the design, the costs and the abuse
-safeguards.
+Trial. Try it at **https://safetygoggles.danmackinlay.workers.dev**: paste a URL, or
+put that address in front of any page's address. Pages others have already goggled
+are listed at [/directory](https://safetygoggles.danmackinlay.workers.dev/directory).
+See [SPEC.md](SPEC.md) for the design, the costs and the abuse safeguards.
+
+**Bookmarklet.** The home page has a drag-to-bookmarks button. GitHub won't render it as
+a link, so if you'd rather make it by hand, create a bookmark with this as its URL:
+
+```
+javascript:location.href="https://safetygoggles.danmackinlay.workers.dev/"+location.href
+```
+
+Logged-in or paywalled pages come out in their logged-out version, because the proxy
+fetches pages without your cookies.
 
 ## Running the prototype
 

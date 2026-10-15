@@ -40,6 +40,9 @@ Phase 0 (TS core + Node CLI) is done; Phase 1 (Cloudflare Worker in `src/worker/
   `OPENROUTER_API_KEY` in `.dev.vars`; ask Dan rather than copying the key there yourself.
   Local D1 needs the schema once: `npx wrangler d1 execute safetygoggles --local --file schema.sql`.
   Worker tests run in plain vitest, with a Map for KV and `node:sqlite` for D1.
+- `npm run regoggle -- <url> [--render]`: drop one page's cached copy on the live
+  Worker. Without `--render` the next visit re-translates (LLM calls); with it, the
+  next visit only re-renders (free).
 - `npm run deploy`: `wrangler deploy`. Dan's Cloudflare account; ask before deploying.
   A plain deploy uses `MODEL` from `wrangler.toml` (real Haiku). The live Worker
   already has `OPENROUTER_API_KEY`, so the first real deploy starts spending, within
@@ -56,8 +59,13 @@ Phase 0 (TS core + Node CLI) is done; Phase 1 (Cloudflare Worker in `src/worker/
   `<n>…</n>` and `<n/>` map back only to clones of the original elements.
   - `serializeDocument()` must stay the last step, because linkedom writes `<title>`
     text raw and that function escapes it.
+- **Translation and rendering stay separate.** LLM output is stored once as a
+  `Translation` (`tr:` in KV). Chrome is applied at render time and cached per
+  `CHROME_VERSION`. Changing anything in `decorate.ts`, or the lens tagline, requires
+  bumping `CHROME_VERSION`. Changing prompts or the primer requires bumping
+  `lens.version`, which costs a re-translation of every page. Never conflate the two.
 - **Every goggled page carries the banner (attribution and original link), the fixed
-  badge, the goggles lens chrome, and `noindex`.** Don't make any of them optional.
+  badge, the goggles lens chrome with its frame print, and `noindex`.** Don't make any of them optional.
   The lens keeps the joke visibly on the AI-safety reader wearing the goggles, not on
   the people in the piece. The page itself
   deliberately doesn't say "satire"; the README does.

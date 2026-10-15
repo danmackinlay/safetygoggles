@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { aiSafety } from "../lenses/ai-safety.ts";
 import { makeBatches, makeSectionBatches, mockRewriter, openAiRewriter } from "../src/core/llm.ts";
 import { parseDocument } from "../src/core/segment.ts";
-import { transmuteHtml } from "../src/core/transmute.ts";
+import { renderTranslation, transmuteHtml } from "../src/core/transmute.ts";
 
 const PAGE = new URL("https://example.org/post");
 const HTML = `<!doctype html><html><head><title>Fifteen years of climate work</title></head>
@@ -37,6 +37,23 @@ describe("transmuteHtml (mock model)", () => {
   it("omits the bookmarklet when there is no live proxy", async () => {
     const r = await transmuteHtml(HTML, PAGE, { lens: aiSafety, rewriter: mockRewriter(), readmeUrl: "x", proxyBase: null });
     expect(r.html).not.toContain("javascript:");
+  });
+});
+
+describe("translate / render split", () => {
+  it("renders a stored translation by source text, leaving unknown text alone", async () => {
+    const r = await transmuteHtml(HTML, PAGE, { lens: aiSafety, rewriter: mockRewriter(), readmeUrl: "x", proxyBase: null });
+    const t = { ...r.translation, rewrites: { "The climate fight": "The alignment fight" } };
+    const doc = parseDocument(renderTranslation(t, { lens: aiSafety, readmeUrl: "x", proxyBase: null }).html);
+    expect(doc.querySelector("h1")!.textContent).toBe("The alignment fight");
+    expect(doc.querySelector("p")!.textContent).toContain("Fossil fuel companies"); // not in the dictionary
+  });
+
+  it("puts the home link and the frame print in the chrome", async () => {
+    const r = await transmuteHtml(HTML, PAGE, { lens: aiSafety, rewriter: mockRewriter(), readmeUrl: "x", proxyBase: "https://goggles.test/" });
+    const doc = parseDocument(r.html);
+    expect([...doc.querySelectorAll("#sg-banner a")].map((a) => a.getAttribute("href"))).toContain("https://goggles.test/");
+    expect(doc.querySelector("#sg-print")!.textContent).toContain("not the original");
   });
 });
 
