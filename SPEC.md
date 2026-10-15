@@ -169,16 +169,30 @@ about 30 s**, roughly 650 fresh articles per $10.
 Typical blog posts are a third to half that size. Fixed costs are about $5/mo for
 Workers Paid and about $10/yr for a domain.
 
-Cost controls, most important first:
-1. **A prepaid API balance** is the hard circuit breaker.
-2. **A global daily dollar budget** is debited from each call's actual `usage`. 20% of
-   it is reserved for the friend key.
-3. **A per-visitor quota** of about 10 misses a day, keyed by a salted daily IP hash.
-4. **The input cap** of about 32k characters.
-5. **The page cache plus the provider's prompt cache.**
-6. Later, a **segment cache for site chrome**, keyed on `(site, lens, text)`.
-7. Later, **request coalescing**: one Durable Object per URL, for when a link goes
-   viral.
+Spend caps, from the true hard stop down. Dan's OpenRouter account uses BYOK for
+Anthropic, so Haiku calls bill his Anthropic key: OpenRouter reports `usage.cost: 0`
+and puts the real charge in `usage.cost_details.upstream_inference_cost`. `costUsd`
+sums both.
+1. **Anthropic workspace spend limit** (monthly). A dedicated workspace and key are
+   used for OpenRouter BYOK. This is the only cap enforced by whoever bills us.
+2. **OpenRouter key limit:** $20/month on a dedicated safetygoggles key, with
+   **"Include BYOK usage in limit"** turned on. It's off by default, and without it
+   BYOK spend is never counted.
+3. **BYOK fallback to paid capacity is allowed.** A failing or exhausted BYOK key may
+   fall back to OpenRouter credits (or Bedrock/Vertex). Dan accepts this, because the
+   $20 key limit counts BYOK and credit spend together.
+4. **The app's daily budget** in D1: `DAILY_BUDGET_USD` (default $1), debited by
+   `costUsd`. This is what turns a bad day into "fogged up until midnight UTC" instead
+   of a dead site for the rest of the month. The Worker treats OpenRouter 402/403
+   errors and Anthropic spend-limit errors the same way.
+5. **Per-visitor rate limit:** a Cloudflare dashboard rule on `/api/transmute`, with no
+   code.
+6. **The input cap** of about 32k characters, the page cache, and the provider's
+   prompt cache.
+
+Concurrent requests can overshoot the OpenRouter and app caps by roughly one page's
+calls. OpenRouter checks against spend already billed, with no in-flight hold for
+BYOK. That's a few cents, which is acceptable.
 
 ## Access model and abuse
 
@@ -190,19 +204,16 @@ There's no hand-maintained allowlist.
   order:
   1. **The denylist:** the opt-out list; login, signin, account and checkout paths;
      webmail and banking hosts; and anything that isn't HTML.
-  2. **The per-visitor quota.**
-  3. **The global daily dollar budget,** with 20% reserved for the friend key. The
-     friend key is a cookie set by `GET /unlock?k=…`.
-  4. **Known bot user-agents** are refused for misses, so crawlers can't goggle whole
-     sites.
+  2. **The daily dollar budget.**
+
+  Per-visitor rate limiting and bot filtering are Cloudflare dashboard settings (a
+  rate-limit rule on `/api/transmute`, and Bot Fight Mode), not code.
 - **The refusal page** ("the goggles are fogged up for today") says the request has
-  been noted. It shows a **directory of already-goggled pages**, grouped by domain and
-  sorted by views.
+  been noted. It shows a **directory of already-goggled pages**, grouped by domain.
 - **Misses are captured automatically.** Every refused or failed miss goes into a
   `wishlist` table: the URL with **query string and fragment stripped**, the reason, a
   count and first and last seen. Raw IPs are never stored. There's no "request"
-  button, which keeps everything GET. `/admin/wishlist?k=…` is visible only to you,
-  and its "goggle it now" link spends from the friend reserve.
+  button and no admin page; Dan reads the table with `wrangler d1 execute`.
 - **`/directory`** is public and lists only pages that actually got goggled. It is
   `noindex`.
 - **The "🥽 Safety-goggle this" bookmarklet** appears on the home page and in every
@@ -211,8 +222,7 @@ There's no hand-maintained allowlist.
   fetch without the reader's cookies, logged-in or paywalled pages come out in their
   logged-out version.
 - **Storage:**
-  - D1 holds `pages`, `wishlist` and `budget`. The budget check is an atomic
-    `UPDATE … WHERE spent < cap`.
+  - D1 holds `pages`, `wishlist` and `budget` (one row per UTC day).
   - KV holds the rendered HTML: a 30-day TTL, plus `s-maxage` of 7 days at the edge.
 
 Hardening in every mode:
@@ -224,8 +234,11 @@ Hardening in every mode:
 - Private IP ranges, single-label hosts and ports other than 80 and 443 are refused.
 - No cookies are forwarded.
 - Every response carries `X-Robots-Tag: noindex`.
-- **Domain reputation:** run this on a throwaway domain, never a subdomain of a domain
-  you care about. If Safe Browsing flags it, the whole registrable domain suffers.
+- **Domain reputation:** the trial runs on `safetygoggles.<subdomain>.workers.dev`.
+  Any later custom domain should be a throwaway, never a subdomain of a domain you care
+  about, because if Safe Browsing flags it the whole registrable domain suffers.
+- **Content-Security-Policy:** goggled pages are served with `script-src 'none'`. The
+  interstitial is our own page and has one small script.
 - **Prompt injection** can only ever change the *text* of a segment (see `apply`).
 
 ## Copyright, attribution and ethics
@@ -263,20 +276,31 @@ src/core/                 runtime-agnostic (Node + Workers)
   decorate.ts             banner, badge (goggles-off link), lens chrome, bookmarklet; no scripts
   transmute.ts            url → goggled HTML + glossary + usage
 src/cli/transmute.ts      Phase 0 CLI → out/<slug>.html + .json
-src/worker/               Phase 1: index (router), gate, db (D1), cache, pages
-schema.sql, wrangler.toml Phase 1
+src/worker/               Phase 1: index (router, API), gate (denylist), db (D1), cache (KV), pages, types
+schema.sql, wrangler.toml Phase 1 (D1 tables; KV + D1 bindings)
 test/                     vitest
 ```
 
 ## Phases
 
-0. ✅ **Core + CLI.** Next step: rewrite quality (see "Rewrite quality is the open
-   problem").
-1. **MVP Worker.** Router, cache, interstitial, gate, D1 directory and wishlist,
-   font proxying. Deploy to a throwaway domain.
-2. **Polish.** Home page, reader-mode fallback.
-3. **Hardening.** Segment cache, request coalescing, opt-out list UI, rate-limit
-   rule.
+0. ✅ **Core + CLI.**
+1. **Trial Worker** on `workers.dev`, in this order:
+   1. Scaffold: `wrangler.toml`, a GET/HEAD-only router, `wrangler dev`.
+   2. Cache: KV keyed on url | lens version | model, with a 30-day TTL plus the edge
+      cache.
+   3. Miss flow: an interstitial calls `/api/transmute` and then reloads. A KV
+      "in progress" marker stops duplicate spend.
+   4. Gate: the denylist, the D1 daily budget, wishlist logging and `/directory`.
+      OpenRouter requests are pinned to Anthropic with no fallback.
+   5. Pages: home (URL box, bookmarklet, README link) and fogged-up.
+   6. Headers: the CSP, `X-Robots-Tag: noindex` and `Referrer-Policy`.
+   7. Dashboard: the rate-limit rule, Bot Fight Mode and, optionally, Cloudflare Access
+      for a friends-only start.
+   8. Deploy and smoke-test, then share with friends. Watch it with `wrangler tail`,
+      the D1 `budget` row and OpenRouter's activity page.
+2. **Later, if needed:** a custom domain, font proxying, reader mode, the segment
+   cache, request coalescing, and a review pass for brand, date and real-organisation
+   slips.
 
 ## Verification
 
@@ -289,10 +313,9 @@ test/                     vitest
 - **Phase 1:** run `wrangler dev` and check:
   - The first load shows the interstitial and finishes within 30 s, and a reload is a
     fast hit.
-  - With the budget set to $0.001, the second URL gets the fogged-up page, which lists
-    the first page.
+  - With `DAILY_BUDGET_USD` set to 0.001, the second URL gets the fogged-up page,
+    which lists the first page.
   - The wishlist row has its query string stripped.
-  - A friend-key request still succeeds.
-  - The 11th miss from the same visitor is refused with reason `quota`.
+  - Two simultaneous requests for the same uncached URL cost one rewrite.
   - POST, PUT and DELETE return 405.
   - A redirect to `127.0.0.1` is refused.

@@ -22,6 +22,8 @@ export interface TransmuteOptions {
 export interface TransmuteResult {
   html: string;
   finalUrl: string;
+  /** The original page's <title>, before rewriting. */
+  title: string;
   glossary: Glossary;
   usage: Usage;
   stats: ApplyStats & { segments: number; rewritten: number; truncated: boolean };
@@ -53,6 +55,7 @@ export async function transmuteHtml(html: string, pageUrl: URL, opts: TransmuteO
   return {
     html: serializeDocument(doc),
     finalUrl: pageUrl.href,
+    title,
     glossary,
     usage: rewriter.usage,
     stats: { ...applied, segments: page.segments.length, rewritten: rewrites.size, truncated },

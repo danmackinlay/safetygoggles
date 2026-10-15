@@ -1,0 +1,22 @@
+name = "safetygoggles"
+main = "src/worker/index.ts"
+compatibility_date = "2026-10-01"
+
+[vars]
+MODEL = "anthropic/claude-haiku-5.5"
+DAILY_BUDGET_USD = "1"
+README_URL = "https://github.com/danmackinlay/safetygoggles#readme"
+
+# Secrets (wrangler secret put …): OPENROUTER_API_KEY
+# Local dev: put MODEL = "mock" in .dev.vars (gitignored) to rewrite for free.
+
+# Rendered pages and in-progress markers. Create with: npx wrangler kv namespace create PAGES
+[[kv_namespaces]]
+binding = "PAGES"
+id = "REPLACE_WITH_KV_ID"
+
+# Budget, directory and wishlist (schema.sql). Create with: npx wrangler d1 create safetygoggles
+[[d1_databases]]
+binding = "DB"
+database_name = "safetygoggles"
+database_id = "REPLACE_WITH_D1_ID"

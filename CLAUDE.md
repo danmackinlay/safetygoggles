@@ -31,9 +31,19 @@ Phase 0 (TS core + Node CLI) is done; Phase 1 (Cloudflare Worker in `src/worker/
   - Cost is OpenRouter's reported `usage.cost`, not a local price table.
   - Watch the `unchanged` count. It measures how much the model is merely
     find-and-replacing.
-  - Haiku runs report `usage.cost` as $0 on OpenRouter, so their printed cost
-    understates real spend.
+  - Dan's OpenRouter account uses BYOK for Anthropic. For BYOK requests `usage.cost` is
+    $0 and the real spend is in `usage.cost_details.upstream_inference_cost`. `costUsd`
+    sums both, so keep that if you touch `recordUsage`.
   - `--out DIR` keeps runs apart when comparing models or prompts.
+- `npm run dev`: the Worker under `wrangler dev` on :8787. `.dev.vars` (gitignored)
+  sets `MODEL = "mock"`, so local requests cost nothing. Real-model local runs need
+  `OPENROUTER_API_KEY` in `.dev.vars`; ask Dan rather than copying the key there yourself.
+  Local D1 needs the schema once: `npx wrangler d1 execute safetygoggles --local --file schema.sql`.
+  Worker tests run in plain vitest, with a Map for KV and `node:sqlite` for D1.
+- `npm run deploy`: `wrangler deploy`. Dan's Cloudflare account; ask before deploying.
+  A plain deploy uses `MODEL` from `wrangler.toml` (real Haiku). The live Worker
+  already has `OPENROUTER_API_KEY`, so the first real deploy starts spending, within
+  the budget gate.
 
 ## Invariants (tests cover these; keep them true)
 

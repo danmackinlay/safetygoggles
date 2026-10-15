@@ -25,7 +25,10 @@ export interface Usage {
   inputTokens: number;
   cachedInputTokens: number;
   outputTokens: number;
-  /** USD as reported by the provider (OpenRouter reports it on every response); null if never reported. */
+  /**
+   * USD actually spent, as reported by OpenRouter: its own charge plus, for BYOK requests,
+   * the upstream provider's charge to your key. Null if never reported.
+   */
   costUsd: number | null;
 }
 
@@ -234,7 +237,9 @@ interface ChatResponse {
     completion_tokens?: number;
     prompt_cache_hit_tokens?: number; // DeepSeek
     prompt_tokens_details?: { cached_tokens?: number }; // OpenAI / OpenRouter
-    cost?: number; // OpenRouter, USD
+    cost?: number; // OpenRouter credits charged, USD (0 for BYOK under the fee allowance)
+    is_byok?: boolean;
+    cost_details?: { upstream_inference_cost?: number | null }; // what the BYOK provider billed
   };
 }
 
@@ -243,7 +248,8 @@ function recordUsage(u: Usage, r: ChatResponse["usage"]): void {
   u.inputTokens += r?.prompt_tokens ?? 0;
   u.outputTokens += r?.completion_tokens ?? 0;
   u.cachedInputTokens += r?.prompt_cache_hit_tokens ?? r?.prompt_tokens_details?.cached_tokens ?? 0;
-  if (typeof r?.cost === "number") u.costUsd = (u.costUsd ?? 0) + r.cost;
+  const upstream = r?.is_byok ? (r.cost_details?.upstream_inference_cost ?? 0) : 0;
+  if (typeof r?.cost === "number") u.costUsd = (u.costUsd ?? 0) + r.cost + upstream;
 }
 
 function stripFences(s: string): string {

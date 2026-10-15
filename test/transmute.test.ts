@@ -73,6 +73,23 @@ describe("openAiRewriter", () => {
     expect(rw.usage.costUsd).toBeCloseTo(0.003);
   });
 
+  it("counts BYOK spend from the upstream cost, not OpenRouter's zero charge", async () => {
+    const usages = [
+      { prompt_tokens: 10, completion_tokens: 5, cost: 0, is_byok: true, cost_details: { upstream_inference_cost: 0.002 } },
+      { prompt_tokens: 10, completion_tokens: 5, cost: 0.001, cost_details: { upstream_inference_cost: 0.0009 } }, // not BYOK: don't double-count
+    ];
+    let i = 0;
+    const fakeFetch = (async () =>
+      new Response(JSON.stringify({
+        choices: [{ message: { content: JSON.stringify({ source_topic: "x", mappings: [], frame: "", author: null }) } }],
+        usage: usages[i++],
+      }))) as unknown as typeof fetch;
+    const rw = openAiRewriter({ baseUrl: "https://llm.test/v1", apiKey: "k", model: "m", fetchImpl: fakeFetch });
+    await rw.glossary({ url: "u", title: "t", text: "x" }, aiSafety);
+    await rw.glossary({ url: "u", title: "t", text: "x" }, aiSafety);
+    expect(rw.usage.costUsd).toBeCloseTo(0.003);
+  });
+
   it("batches by size", () => {
     const segs = [10, 10, 10, 25].map((n, id) => ({ id, source: "x".repeat(n), original: "", heading: false }));
     expect(makeBatches(segs, 20).map((b) => b.map((s) => s.id))).toEqual([[0, 1], [2], [3]]);
