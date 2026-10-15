@@ -70,7 +70,7 @@ export async function translateHtml(html: string, pageUrl: URL, opts: TranslateO
   const { lens, rewriter } = opts;
   const doc = parseDocument(html);
   sanitize(doc, pageUrl); // link targets don't affect segment text
-  const page = extractSegments(doc, { maxSourceChars: opts.maxSourceChars ?? 32_000 });
+  const page = extractSegments(doc, { maxSourceChars: opts.maxSourceChars ?? 100_000 });
 
   const title = doc.querySelector("title")?.textContent?.trim() ?? "";
   const text = page.segments.map((s) => s.original).join("\n").slice(0, opts.glossaryChars ?? 24_000);

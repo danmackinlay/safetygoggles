@@ -22,7 +22,7 @@ export function interstitialPage(target: string): string {
   return shell(
     "safetygoggles: putting on goggles…",
     `<h1>🥽 Putting on goggles…</h1>
-<p id="msg">The first visit to a page takes about half a minute. After that it's instant for everyone.</p>
+<p id="msg">The first visit to a page takes up to a minute. After that it's instant for everyone.</p>
 <p><a href="${escapeHtml(target)}">Read the original instead</a></p>`,
     `data-target="${escapeHtml(target)}"`,
     `<script src="/sg.js"></script>`,

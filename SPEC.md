@@ -97,7 +97,8 @@ What to bump:
      numbered placeholders, as in `We <1>poll</1> the public<2/>`.
    - Code, `pre`, SVG and similar elements are opaque and never translated.
    - `<title>` and the description and og/twitter meta tags are segments too.
-   - Segments stop at a cap of about 32k characters (~8k tokens). Past the cap the
+   - Segments stop at a cap of about 100k characters (~25k tokens). A 100k page costs
+     about 6.5¢ and takes about 50 s on Haiku, most of it the uncached shared prefix. Past the cap the
      page stays original and the banner says so.
 4. **Glossary pass (one call).** The input is the lens primer plus the page text. The
    output is `{source_topic, mappings[], frame, author}`. Every source-world proper
