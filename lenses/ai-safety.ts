@@ -18,7 +18,7 @@ export const aiSafety: Lens = {
   id: "ai-safety",
   version: "ai-safety@4",
   target: "AI safety",
-  tagline: "Everything is AI safety if you squint.",
+  tagline: "Now it’s relevant to you.",
   primer: `
 THE TARGET WORLD: AI safety and the governance of advanced AI, as seen from inside the
 community (rationalists, effective altruists, alignment researchers, policy people).

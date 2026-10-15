@@ -245,7 +245,7 @@ Hardening in every mode:
 
 Not legal advice.
 - **The page doesn't say "satire"; the README does.** On the page, the banner leads
-  with a wry tagline ("Everything is AI safety if you squint."). It then states the
+  with a wry tagline ("Now it’s relevant to you."), aimed at the reader. It then states the
   facts: "This page was originally written by {author} about {topic}; safetygoggles
   rewrote it." Links to the original and the README follow. False attribution is a
   bigger risk than copyright, and this factual line is what addresses it.

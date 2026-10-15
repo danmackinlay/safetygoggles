@@ -1,6 +1,7 @@
 // Our own pages: home, the "putting on goggles" interstitial (and its script), the
 // fogged-up and error pages, and the directory. Goggled pages themselves come from core.
 
+import { aiSafety } from "../../lenses/ai-safety.ts";
 import { escapeHtml } from "../core/segment.ts";
 import type { PageRow } from "./db.ts";
 
@@ -9,7 +10,7 @@ export function homePage(proxyBase: string, readmeUrl: string): string {
   return shell(
     "safetygoggles",
     `<h1>🥽 safetygoggles</h1>
-<p>Everything is AI safety if you squint.</p>
+<p>${escapeHtml(aiSafety.tagline)}</p>
 <form action="/" method="get"><input name="url" type="url" placeholder="https://…" required autofocus> <button>Put on goggles</button></form>
 <p><a class="bm" href="${escapeHtml(bookmarklet)}">🥽 Safety-goggle this</a> ← drag to your bookmarks bar</p>
 <p><a href="/directory">Already goggled</a> · <a href="${escapeHtml(readmeUrl)}">What is this?</a></p>`,
