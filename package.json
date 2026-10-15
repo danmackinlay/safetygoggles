@@ -1,0 +1,25 @@
+{
+  "name": "safetygoggles",
+  "version": "0.0.1",
+  "private": true,
+  "description": "A satirical proxy that rewrites any web page as if it were about AI Safety.",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "goggle": "tsx src/cli/transmute.ts",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.core.json"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "linkedom": "^0.18.13"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.4"
+  }
+}

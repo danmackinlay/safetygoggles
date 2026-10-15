@@ -1,0 +1,6 @@
+{
+  // Core must run unchanged in a Cloudflare Worker: Web-standard globals only, no Node types.
+  "extends": "./tsconfig.json",
+  "compilerOptions": { "types": [] },
+  "include": ["src/core", "lenses"]
+}

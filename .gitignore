@@ -147,3 +147,13 @@ vite.config.ts.timestamp-*
 
 # Turbo Repo
 .turbo
+
+# safetygoggles
+out/
+.wrangler/
+.dev.vars
+
+
+# Environment variable files
+.env
+.envrc
