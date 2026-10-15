@@ -12,7 +12,7 @@ import type { Glossary } from "./llm.ts";
  * Rendered pages are cached per chrome version, so a bump re-renders every page on its
  * next visit from the stored translation: CPU only, no LLM calls.
  */
-export const CHROME_VERSION = 2;
+export const CHROME_VERSION = 3;
 
 const FRAME_PRINT = "safetygoggles · rewritten by machine · not the original · ";
 
@@ -46,7 +46,7 @@ export function decorate(doc: Document, o: DecorateOptions): void {
     { id: "sg-banner", role: "note" },
     h("strong", {}, `🥽 ${o.lens.tagline}`),
     ` This page was originally ${author ? `written by ${author} ` : ""}about ${sourceTopic}; safetygoggles rewrote it.`,
-    ...(o.truncated ? [" The goggles ran out of lens partway down, so the rest is unaltered."] : []),
+    ...(o.truncated ? [" I ran out of patience part way through, so I didn't translate the whole thing, but won't you be reading it via an LLM anyway?"] : []),
     " ",
     link(o.originalUrl, "Read the original"),
     ...(o.proxyBase ? [" · ", link(o.proxyBase, "🥽 Goggle a page yourself")] : []),
