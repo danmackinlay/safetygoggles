@@ -1,65 +1,59 @@
 # 🥽 safetygoggles
 
 **Satire.** safetygoggles rewrites any web page as if it were about AI Safety. It
-keeps the page's look, its structure and its argument, and changes the subject.
+keeps the page’s look, its structure and its argument, and changes the subject.
 
-## Why
+## Problem: AI Safety people are slow to learn from other fields
 
 People working on AI Safety tend not to take seriously the hard-won lessons of people
-who have spent decades on other catastrophic risks: climate, nuclear, pandemics.
+who have spent decades on other contentious issues: climate, nuclear war, pandemics, disinformation…
 
-Take Tom Brookes'
-[*Lessons and reflections from 15 years in the climate community*](https://www.greenfunders.org/blog/lessons-and-reflections-from-15-years-in-the-climate-community/).
-Its first lesson is "we will not win because we are right". Others: access is not
-influence, and plan for your opposition. Every one of those lessons applies to AI
-Safety. Most AI Safety readers will never
-take it in, because it's "about climate".
+Take Tom Brookes’
+[*Lessons and reflections from 15 years in the climate community*](https://www.greenfunders.org/blog/lessons-and-reflections-from-15-years-in-the-climate-community/).
+Its first lesson is “we will not win because we are right.”
+Others, “access is not influence”, and “plan for your opposition.”
+Hot damn, how much are AI Safety people missing that memo?
+Every one of those lessons applies to AI Safety and is being laboriously rediscovered inside AI Safety as you read this.
+Most AI Safety readers will never choose the speen-run option of just reading that piece, because it’s “about climate.”
 
-So put on the goggles. If the advice reads as obviously right once it's about AI,
-maybe it was right all along.
+Wo, worry no longer!
+Now if you are worried about that AI Safety friend who being a bit dense about well-understood problems, such as public comms, or movement building, or legitimacy…
+Worry no longer!
+They can [put on the goggles](https://safetygoggles.danmackinlay.workers.dev/https://www.greenfunders.org/blog/lessons-and-reflections-from-15-years-in-the-climate-community/) and safely read expertise from other fields, bathed in that warm glow of thinking it came from the AI Safety field!
 
-## What you're looking at
+## What you’re looking at
 
-A goggled page is a satirical machine rewrite of someone else's work. **The original
-author did not write it and may not agree with it.** Every goggled page has:
-- a banner saying who originally wrote it and what it was about, with a link to the
+A goggled page is a satirical machine rewrite of someone else’s work to make it about AI Safety. **The original author did not write it and may not agree with it.**
+Every goggled page has:
+- a banner saying who originally wrote it and what it was about, with a link to the
   original;
-- a fixed **"🥽 safetygoggles · 👓 Goggles off"** badge that takes you to the original;
-- "rewritten by machine · not the original" printed along the bottom of the goggles
+- a **“🥽 safetygoggles · 👓 Goggles off”** badge that takes you to the original;
+- “rewritten by machine · not the original” printed along the bottom of the goggles
   frame.
 
-The rewrite may give the author an imaginary AI-safety career. Any organisations in
-it are invented.
+The rewrite may give the author an imaginary AI-safety career.
+Any organisations in it are invented, and resemblance to real organisations, current or defunct, or people, alive, dead or simulated, is coincidental.
 
 Pages are not indexed by search engines, cached only briefly, and never monetised.
+No data is collected by me.
 
 ## Opt-out and takedown
 
-If you own a site and don't want it goggled, open an issue on this repository.
+If you own a site and don’t want it safety goggled, open an issue on this repository.
 Opt-outs are honoured promptly and cached copies are deleted.
 
 ## Status
 
-Trial. Try it at **https://safetygoggles.danmackinlay.workers.dev**: paste a URL, or
-put that address in front of any page's address. Pages others have already goggled
+Trial. Try it at **https://safetygoggles.danmackinlay.workers.dev**: paste a URL, or
+put that address in front of any page’s address. Pages others have already goggled
 are listed at [/directory](https://safetygoggles.danmackinlay.workers.dev/directory).
 See [SPEC.md](SPEC.md) for the design, the costs and the abuse safeguards.
 
-**Bookmarklet.** The home page has a drag-to-bookmarks button. GitHub won't render it as
-a link, so if you'd rather make it by hand, create a bookmark with this as its URL:
+## Running it yourself
 
-```
-javascript:location.href="https://safetygoggles.danmackinlay.workers.dev/"+location.href
-```
-
-Logged-in or paywalled pages come out in their logged-out version, because the proxy
-fetches pages without your cookies.
-
-## Running the prototype
-
-You need Node 20+ and an [OpenRouter](https://openrouter.ai/) API key. Any other
-OpenAI-compatible endpoint also works via `SG_BASE_URL` and `SG_API_KEY`. The default
-model, Claude Haiku 5.5, costs about 1.5¢ per long article.
+You need Node 20+ and an [OpenRouter](https://openrouter.ai/) API key.
+Any other OpenAI-compatible endpoint also works via `SG_BASE_URL` and `SG_API_KEY`.
+The default model, Claude Haiku 5.5, costs about 1.5¢ per long article.
 
 Put the key in an untracked `.envrc` (copy [env.example](env.example)) and load it
 with [direnv](https://direnv.net/):
@@ -72,11 +66,11 @@ direnv exec . npm run goggle -- https://www.greenfunders.org/blog/lessons-and-re
 open out/*.html
 ```
 
-If you `cd` into a direnv-enabled shell, the key is already loaded and a plain
+If you `cd` into a direnv-enabled shell, the key is already loaded and a plain
 `npm run goggle -- <url>` works. Exporting `OPENROUTER_API_KEY` by any other means
 works too. The CLI prints the cost OpenRouter reports for the run.
 
-`--mock` runs the whole pipeline with a dumb word swap and no API calls.
+`--mock` runs the whole pipeline with a dumb word swap and no API calls.
 
 | Variable | Default | Meaning |
 |---|---|---|
@@ -87,4 +81,8 @@ works too. The CLI prints the cost OpenRouter reports for the run.
 | `SG_PROXY_BASE` | unset | live proxy root; routes links through it and enables the bookmarklet |
 
 Tests: `npm test`. Type-checks: `npm run typecheck`. The second type-check confirms
-that `src/core` uses only Web APIs, so it can run in a Worker.
+that `src/core` uses only Web APIs, so it can run in a Worker.
+
+## Who made this
+
+[Dan MacKinlay](https://danmackinlay.name).
