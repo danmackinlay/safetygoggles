@@ -28,6 +28,8 @@ export interface Env {
   DAILY_BUDGET_USD: string;
   README_URL: string;
   OPENROUTER_API_KEY?: string;
+  /** Webhook for "out of money" alerts (ntfy topic URL, Slack or Discord webhook). Secret. */
+  NOTIFY_URL?: string;
   PAGES: KV;
   DB: D1;
 }

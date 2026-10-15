@@ -12,6 +12,7 @@ import { renderTranslation, translateUrl, type Translation } from "../core/trans
 import { getRendered, getTranslation, pageKey, putRendered, putTranslation, tryLock, unlock } from "./cache.ts";
 import { countView, directory, exhaustToday, logMiss, recordPage, recordSpend, spentToday } from "./db.ts";
 import { denyReason } from "./gate.ts";
+import { notifyOnce } from "./notify.ts";
 import { deniedPage, directoryPage, errorPage, foggedPage, homePage, INTERSTITIAL_SCRIPT, interstitialPage } from "./pages.ts";
 import type { Ctx, Env } from "./types.ts";
 
@@ -87,7 +88,8 @@ async function transmuteApi(target: string, env: Env, ctx: Ctx, self: URL): Prom
   const { page, key } = checked;
 
   if (await getTranslation(env.PAGES, key)) return json({ status: "ready" });
-  if ((await spentToday(env.DB)) >= budget(env)) {
+  const spentBefore = await spentToday(env.DB);
+  if (spentBefore >= budget(env)) {
     ctx.waitUntil(logMiss(env.DB, page.href, "budget").catch(() => undefined));
     return json({ status: "fogged" });
   }
@@ -111,6 +113,10 @@ async function transmuteApi(target: string, env: Env, ctx: Ctx, self: URL): Prom
       // The OpenRouter key's limit (or credits) ran out: fog up for the rest of the day.
       await exhaustToday(env.DB, budget(env));
       ctx.waitUntil(logMiss(env.DB, page.href, "llm-limit").catch(() => undefined));
+      ctx.waitUntil(
+        notifyOnce(env, "llm-limit", `🥽 safetygoggles: OpenRouter refused a request (${e.message.slice(0, 120)}). The key's monthly limit or credits are probably used up; new pages are fogged until midnight UTC.`)
+          .catch((err) => console.error("notify failed", err)),
+      );
       return json({ status: "fogged" });
     }
     console.error("transmute failed", page.href, e);
@@ -119,7 +125,16 @@ async function transmuteApi(target: string, env: Env, ctx: Ctx, self: URL): Prom
   } finally {
     // Spend counts even when the run failed.
     const cost = rewriter?.usage.costUsd;
-    if (cost) await recordSpend(env.DB, cost).catch((e) => console.error("recordSpend failed", e));
+    if (cost) {
+      await recordSpend(env.DB, cost).catch((e) => console.error("recordSpend failed", e));
+      const cap = budget(env);
+      if (spentBefore < cap && spentBefore + cost >= cap) {
+        ctx.waitUntil(
+          notifyOnce(env, "budget", `🥽 safetygoggles spent today's $${cap} budget. New pages are fogged until midnight UTC; cached pages still work. To add coins, raise DAILY_BUDGET_USD.`)
+            .catch((err) => console.error("notify failed", err)),
+        );
+      }
+    }
     await unlock(env.PAGES, key).catch(() => undefined);
   }
 }

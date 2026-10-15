@@ -43,6 +43,8 @@ Phase 0 (TS core + Node CLI) is done; Phase 1 (Cloudflare Worker in `src/worker/
 - `npm run regoggle -- <url> [--render]`: drop one page's cached copy on the live
   Worker. Without `--render` the next visit re-translates (LLM calls); with it, the
   next visit only re-renders (free).
+- Out-of-money alerts go to the `NOTIFY_URL` Worker secret (`src/worker/notify.ts`).
+  Set it with `npx wrangler secret put NOTIFY_URL`; without it, no alerts are sent.
 - `npm run deploy`: `wrangler deploy`. Dan's Cloudflare account; ask before deploying.
   A plain deploy uses `MODEL` from `wrangler.toml` (real Haiku). The live Worker
   already has `OPENROUTER_API_KEY`, so the first real deploy starts spending, within

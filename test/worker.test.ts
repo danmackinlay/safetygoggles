@@ -162,3 +162,53 @@ describe("goggling flow", () => {
     expect(dir).not.toContain("session=xyz");
   });
 });
+
+describe("out-of-money alerts", () => {
+  // A fake OpenRouter that charges `costPerCall` (or refuses with `status`), plus a fake
+  // ntfy topic that records what it was sent.
+  function fakeServices(opts: { costPerCall?: number; status?: number }) {
+    const alerts: string[] = [];
+    vi.stubGlobal("fetch", async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.startsWith("https://ntfy.example/")) {
+        alerts.push(String(init?.body));
+        return new Response("ok");
+      }
+      if (url.startsWith("https://openrouter.ai/")) {
+        if (opts.status) return new Response("Key limit exceeded", { status: opts.status });
+        const userMessage: string = JSON.parse(String(init?.body)).messages[1].content;
+        const user = userMessage.startsWith("{") ? JSON.parse(userMessage) : {}; // rewrite batches are JSON, the glossary call isn't
+        const content = user.segments
+          ? { segments: user.segments.map((x: any) => ({ id: x.id, text: x.text })) }
+          : { source_topic: "climate change", mappings: [], frame: "", author: null };
+        return new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify(content) } }], usage: { cost: opts.costPerCall ?? 0 } }));
+      }
+      return new Response(ORIGIN_HTML, { headers: { "content-type": "text/html; charset=utf-8" } });
+    });
+    env.MODEL = "anthropic/claude-haiku-5.5";
+    env.OPENROUTER_API_KEY = "test-key";
+    env.NOTIFY_URL = "https://ntfy.example/sg-alerts";
+    return alerts;
+  }
+
+  it("alerts once when a rewrite pushes today's spend over the budget", async () => {
+    const alerts = fakeServices({ costPerCall: 0.4 }); // glossary + 1 batch = $0.80 per page
+    await call("/api/transmute?url=https://example.org/a"); // $0.80 of $1
+    expect(alerts).toEqual([]);
+    await call("/api/transmute?url=https://example.org/b"); // crosses $1
+    expect(alerts).toHaveLength(1);
+    expect(alerts[0]).toContain("spent today's $1 budget");
+    expect(await (await call("/api/transmute?url=https://example.org/c")).json()).toEqual({ status: "fogged" });
+    expect(alerts).toHaveLength(1);
+  });
+
+  it("alerts once when OpenRouter refuses, and fogs up for the day", async () => {
+    const alerts = fakeServices({ status: 403 });
+    expect(await (await call("/api/transmute?url=https://example.org/a")).json()).toEqual({ status: "fogged" });
+    expect(alerts).toHaveLength(1);
+    expect(alerts[0]).toContain("OpenRouter refused");
+    expect(await (await call("/api/transmute?url=https://example.org/b")).json()).toEqual({ status: "fogged" });
+    expect(alerts).toHaveLength(1);
+  });
+});
+

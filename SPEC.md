@@ -213,6 +213,12 @@ sums both.
 6. **The input cap** of about 32k characters, the page cache, and the provider's
    prompt cache.
 
+**Alerts.** When a rewrite pushes today's spend past `DAILY_BUDGET_USD`, or OpenRouter
+refuses a request (402/403, i.e. the key limit or credits are exhausted), the Worker
+posts once per kind per UTC day to `NOTIFY_URL`, a Worker secret. That can be an ntfy.sh
+topic (pushes to a phone, plain text), a Slack webhook or a Discord webhook; the body
+format follows the hostname.
+
 Concurrent requests can overshoot the OpenRouter and app caps by roughly one page's
 calls. OpenRouter checks against spend already billed, with no in-flight hold for
 BYOK. That's a few cents, which is acceptable.
