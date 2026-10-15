@@ -107,6 +107,29 @@ describe("openAiRewriter", () => {
     expect(rw.usage.costUsd).toBeCloseTo(0.003);
   });
 
+  it("marks the shared prefix for Anthropic's prompt cache, keeping the exemplar outside it", async () => {
+    const systems: any[] = [];
+    const fakeFetch = (async (_url: string, init: RequestInit) => {
+      const body = JSON.parse(String(init.body));
+      systems.push(body.messages[0].content);
+      const user = JSON.parse(body.messages[1].content);
+      const content = { segments: user.segments.map((s: any) => ({ id: s.id, text: s.text })) };
+      return new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify(content) } }], usage: {} }));
+    }) as unknown as typeof fetch;
+    const seg = (id: number, text: string, heading = false) => ({ id, source: text, original: text, heading });
+    const segs = [seg(0, "Intro", true), seg(1, "lead paragraph ".repeat(15)), seg(2, "Part two", true), seg(3, "second body")];
+    const rw = openAiRewriter({ baseUrl: "https://llm.test/v1", apiKey: "k", model: "anthropic/claude-haiku-5.5", batchChars: 240, fetchImpl: fakeFetch });
+    await rw.rewrite(segs, { sourceTopic: "x", mappings: [], frame: "", author: null }, aiSafety);
+
+    expect(systems).toHaveLength(2);
+    const [lead, later] = systems;
+    expect(lead).toHaveLength(1);
+    expect(lead[0].cache_control).toEqual({ type: "ephemeral" });
+    expect(later[0]).toEqual(lead[0]); // identical cached prefix
+    expect(later[1].text).toContain("already been rewritten");
+    expect(later[1].cache_control).toBeUndefined();
+  });
+
   it("batches by size", () => {
     const segs = [10, 10, 10, 25].map((n, id) => ({ id, source: "x".repeat(n), original: "", heading: false }));
     expect(makeBatches(segs, 20).map((b) => b.map((s) => s.id))).toEqual([[0, 1], [2], [3]]);

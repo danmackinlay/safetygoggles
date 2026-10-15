@@ -98,8 +98,8 @@ What to bump:
    - Code, `pre`, SVG and similar elements are opaque and never translated.
    - `<title>` and the description and og/twitter meta tags are segments too.
    - Segments stop at a cap of about 100k characters (~25k tokens). A 100k page
-     costs about 6.5¢ and takes about 50 s on Haiku, mostly for the uncached shared
-     prefix. Past the cap the page stays original and the banner says so.
+     cost about 6.5¢ and took about 50 s on Haiku before prompt caching, mostly for
+     the shared prefix re-sent with every batch. Past the cap the page stays original and the banner says so.
 4. **Glossary pass (one call).** The input is the lens primer plus the page text. The
    output is `{source_topic, mappings[], frame, author}`. Every source-world proper
    noun gets a specific counterpart: a real institution only in its real role,
@@ -112,8 +112,11 @@ What to bump:
      get the lead's rewrite as a voice and naming exemplar.
 
    Every call starts with the same system prompt: lens primer, rules, the original page
-   text (capped at about 24k characters), then this page's glossary. So the provider's
-   prompt cache applies, when it works. JSON goes in and comes out. Missing ids get one
+   text (capped at about 24k characters), then this page's glossary. For Anthropic
+   models that prefix carries a `cache_control` breakpoint. The lead call writes the
+   cache at 1.25× input price, and every second-wave call reads it at 0.1×. The lead's
+   exemplar goes in a separate, uncached block after the breakpoint. On Tom's article,
+   63k of 100k input tokens were cached, and the cost fell from about 1.6¢ to 1.1¢. JSON goes in and comes out. Missing ids get one
    retry in smaller batches.
 6. **`apply`.**
    - Placeholders map back to clones of the *original* elements. Everything else

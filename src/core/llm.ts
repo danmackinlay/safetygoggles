@@ -137,8 +137,18 @@ export function openAiRewriter(cfg: LlmConfig): Rewriter {
   const concurrency = cfg.concurrency ?? 8;
   const batchChars = cfg.batchChars ?? 5000;
   const usage = emptyUsage();
+  // Anthropic only caches prompts when asked: mark the end of the shared prefix. Other
+  // providers cache automatically (or not at all) and get plain strings.
+  const explicitCache = cfg.model.startsWith("anthropic/");
 
-  async function chatJson(system: string, user: string): Promise<unknown> {
+  /** `system` is the cacheable shared prefix; `systemTail` varies between calls. */
+  async function chatJson(system: string, user: string, systemTail = ""): Promise<unknown> {
+    const systemContent = explicitCache
+      ? [
+          { type: "text", text: system, cache_control: { type: "ephemeral" } },
+          ...(systemTail ? [{ type: "text", text: systemTail }] : []),
+        ]
+      : system + systemTail;
     let lastError: unknown;
     for (let attempt = 0; attempt < 3; attempt++) {
       if (attempt) await new Promise((r) => setTimeout(r, 1000 * 2 ** attempt));
@@ -149,7 +159,7 @@ export function openAiRewriter(cfg: LlmConfig): Rewriter {
           body: JSON.stringify({
             model: cfg.model,
             messages: [
-              { role: "system", content: system },
+              { role: "system", content: systemContent },
               { role: "user", content: user },
             ],
             response_format: { type: "json_object" },
@@ -198,13 +208,15 @@ export function openAiRewriter(cfg: LlmConfig): Rewriter {
     // primer, rules, original page and glossary as one cacheable prefix.
     async rewrite(segments, glossary, lens) {
       const pageText = segments.map((s) => s.original).join("\n").slice(0, cfg.contextChars ?? 24_000);
-      let system = rewritePrompt(lens, glossary, pageText);
+      const system = rewritePrompt(lens, glossary, pageText);
+      let exemplar = "";
       const out = new Map<number, string>();
       if (!segments.length) return out;
       const runBatch = async (batch: Segment[]) => {
         const raw = (await chatJson(
           system,
           JSON.stringify({ segments: batch.map((s) => ({ id: s.id, text: s.source })) }),
+          exemplar,
         )) as { segments?: { id: unknown; text: unknown }[] };
         const wanted = new Set(batch.map((s) => s.id));
         for (const item of raw.segments ?? []) {
@@ -218,7 +230,8 @@ export function openAiRewriter(cfg: LlmConfig): Rewriter {
       const lead = batches[leadIndex] ?? [];
       await runBatch(lead).catch(() => undefined);
       const leadText = lead.flatMap((s) => out.get(s.id) ?? []).map((t) => t.replace(/<\/?\d+\/?>/g, "")).join("\n");
-      if (leadText) system += exemplarPrompt(leadText);
+      // The lead call wrote the prefix to the provider's cache; later calls read it.
+      if (leadText) exemplar = exemplarPrompt(leadText);
       await pool(batches.filter((_, i) => i !== leadIndex), concurrency, (b) => runBatch(b).catch(() => undefined));
       // One retry, in small batches, for whatever went missing.
       const missing = segments.filter((s) => !out.has(s.id));
