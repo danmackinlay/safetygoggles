@@ -181,7 +181,7 @@ sums both.
 3. **BYOK fallback to paid capacity is allowed.** A failing or exhausted BYOK key may
    fall back to OpenRouter credits (or Bedrock/Vertex). Dan accepts this, because the
    $20 key limit counts BYOK and credit spend together.
-4. **The app's daily budget** in D1: `DAILY_BUDGET_USD` (default $1), debited by
+4. **The app's daily budget** in D1: `DAILY_BUDGET_USD` (default $2), debited by
    `costUsd`. This is what turns a bad day into "fogged up until midnight UTC" instead
    of a dead site for the rest of the month. The Worker treats OpenRouter 402/403
    errors and Anthropic spend-limit errors the same way.

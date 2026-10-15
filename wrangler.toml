@@ -4,7 +4,7 @@ compatibility_date = "2026-10-01"
 
 [vars]
 MODEL = "anthropic/claude-haiku-5.5"
-DAILY_BUDGET_USD = "1"
+DAILY_BUDGET_USD = "2"
 README_URL = "https://github.com/danmackinlay/safetygoggles#readme"
 
 # Secrets (wrangler secret put …): OPENROUTER_API_KEY
